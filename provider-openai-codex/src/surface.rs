@@ -9,8 +9,8 @@
 //! registration emits.
 
 use llm_router::types::router::{
-    ProviderAbortRequest, ProviderAbortResponse, ProviderReadyAck, ProviderStreamInput,
-    ProviderStreamOutput, RefreshModelsRequest, RefreshModelsResponse, RouterReadyEvent,
+    ProviderAbortRequest, ProviderAbortResponse, ProviderReadyAck, ProviderStreamOutput,
+    RefreshModelsRequest, RefreshModelsResponse, RouterReadyEvent,
 };
 
 pub const STREAM_ID: &str = "provider::openai-codex::stream";
@@ -29,6 +29,11 @@ pub const REFRESH_MODELS_DESC: &str = "Fetch the authenticated Codex model catal
 pub const ON_ROUTER_READY_ID: &str = "provider::openai-codex::on_router_ready";
 pub const ON_ROUTER_READY_DESC: &str =
     "Internal: router::ready subscriber that re-declares this provider and refreshes its catalog.";
+
+pub const COUNT_TOKENS_ID: &str = "provider::openai-codex::count_tokens";
+pub const COUNT_TOKENS_DESC: &str =
+    "Count prompt tokens for {model, system_prompt?, tools?, messages} locally with the \
+     tiktoken tokenizers; never runs the model and costs nothing.";
 
 /// One function's complete agent-facing wire surface: id, registration
 /// description, and the schemars-derived request/response schemas.
@@ -62,9 +67,13 @@ where
 /// `tests/schemas.rs`; keep in lockstep with `register::register_provider`.
 pub fn catalog() -> Vec<FunctionSpec> {
     vec![
-        spec::<ProviderStreamInput, ProviderStreamOutput>(STREAM_ID, STREAM_DESC),
+        spec::<crate::stream_fn::CodexStreamInput, ProviderStreamOutput>(STREAM_ID, STREAM_DESC),
         spec::<ProviderAbortRequest, ProviderAbortResponse>(ABORT_ID, ABORT_DESC),
         spec::<RefreshModelsRequest, RefreshModelsResponse>(REFRESH_MODELS_ID, REFRESH_MODELS_DESC),
         spec::<RouterReadyEvent, ProviderReadyAck>(ON_ROUTER_READY_ID, ON_ROUTER_READY_DESC),
+        spec::<crate::count_tokens::CountTokensRequest, crate::count_tokens::CountTokensResponse>(
+            COUNT_TOKENS_ID,
+            COUNT_TOKENS_DESC,
+        ),
     ]
 }

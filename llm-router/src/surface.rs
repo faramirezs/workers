@@ -13,12 +13,13 @@
 use crate::chat::chat::{ChatCall, ChatFnInput};
 use crate::types::router::{
     AbortRequest, AbortResponse, ChatResponse, CompleteResponse, ConfigChangedEvent,
-    ModelBudgetRequest, ModelBudgetResponse, ModelGetRequest, ModelGetResponse, ModelsListRequest,
-    ModelsListResponse, ModelsReconcileRequest, ModelsReconcileResponse, ModelsSupportsRequest,
-    ModelsSupportsResponse, ProviderListRequest, ProviderListResponse, ProviderRegisterRequest,
-    ProviderRegisterResponse, ProviderResolveRequest, ProviderResolveResponse, RouteRequest,
-    RouteResponse, RouterAck, SystemPromptGetRequest, SystemPromptGetResponse,
-    UpdateCredentialRequest, UpdateCredentialResponse,
+    FunctionsChangedEvent, ModelBudgetRequest, ModelBudgetResponse, ModelGetRequest,
+    ModelGetResponse, ModelsListRequest, ModelsListResponse, ModelsReconcileRequest,
+    ModelsReconcileResponse, ModelsSupportsRequest, ModelsSupportsResponse, ProviderListRequest,
+    ProviderListResponse, ProviderRegisterRequest, ProviderRegisterResponse,
+    ProviderResolveRequest, ProviderResolveResponse, RouteRequest, RouteResponse, RouterAck,
+    SystemPromptGetRequest, SystemPromptGetResponse, UpdateCredentialRequest,
+    UpdateCredentialResponse,
 };
 
 // ── function id + description constants — consumed by both register_router and
@@ -42,6 +43,12 @@ pub const EMBED_DESC: &str =
     "Batch text embeddings through a provider's provider::<id>::embed surface. Names a provider \
      or discovers the first embed-capable one from the live registry; one vector per input, \
      order preserved.";
+
+pub const COUNT_TOKENS_ID: &str = "router::count_tokens";
+pub const COUNT_TOKENS_DESC: &str =
+    "Count prompt tokens for {model, provider?, system_prompt?, tools?, messages} through the \
+     resolved provider's provider::<id>::count_tokens surface; never runs the model and costs \
+     nothing.";
 
 pub const MODELS_LIST_ID: &str = "router::models::list";
 pub const MODELS_LIST_DESC: &str =
@@ -88,6 +95,12 @@ pub const MODELS_RECONCILE_ID: &str = "router::models::reconcile";
 pub const MODELS_RECONCILE_DESC: &str =
     "Replace a provider's catalog slice — the only catalog write path (token-gated).";
 
+pub const ON_FUNCTIONS_CHANGED_ID: &str = "router::on_functions_changed";
+pub const ON_FUNCTIONS_CHANGED_DESC: &str =
+    "Internal: a worker's function registrations changed — re-discover live \
+     providers and nudge them to re-declare, so a provider that reconnected \
+     is resolvable again without waiting for its own catalog timer.";
+
 pub const ON_CONFIG_CHANGED_ID: &str = "router::on_config_changed";
 pub const ON_CONFIG_CHANGED_DESC: &str =
     "Internal: reactively reload the in-memory configuration snapshot and \
@@ -131,6 +144,10 @@ pub fn catalog() -> Vec<FunctionSpec> {
         spec::<crate::embed::RouterEmbedRequest, crate::embed::RouterEmbedResponse>(
             EMBED_ID, EMBED_DESC,
         ),
+        spec::<
+            crate::count_tokens::RouterCountTokensRequest,
+            crate::count_tokens::RouterCountTokensResponse,
+        >(COUNT_TOKENS_ID, COUNT_TOKENS_DESC),
         spec::<ModelsListRequest, ModelsListResponse>(MODELS_LIST_ID, MODELS_LIST_DESC),
         spec::<ModelGetRequest, Option<ModelGetResponse>>(MODELS_GET_ID, MODELS_GET_DESC),
         spec::<ModelBudgetRequest, Option<ModelBudgetResponse>>(
@@ -164,5 +181,9 @@ pub fn catalog() -> Vec<FunctionSpec> {
             MODELS_RECONCILE_DESC,
         ),
         spec::<ConfigChangedEvent, RouterAck>(ON_CONFIG_CHANGED_ID, ON_CONFIG_CHANGED_DESC),
+        spec::<FunctionsChangedEvent, RouterAck>(
+            ON_FUNCTIONS_CHANGED_ID,
+            ON_FUNCTIONS_CHANGED_DESC,
+        ),
     ]
 }

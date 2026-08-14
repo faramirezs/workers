@@ -9,6 +9,7 @@ use serde_json::Value;
 mod code;
 mod config;
 mod configuration;
+mod events;
 mod exec;
 mod exec_dispatch;
 mod filesystem_access;
@@ -20,6 +21,7 @@ mod scode;
 mod target;
 mod telemetry;
 mod triggers;
+mod ui;
 
 use configuration::AppState;
 use functions::types::{KillRequest, StatusRequest};
@@ -219,6 +221,7 @@ async fn main() -> Result<()> {
     let code_cells = configuration::build_code_cells(&cfg)
         .map_err(anyhow::Error::msg)
         .context("building initial code surface state (coder::*)")?;
+    let watch_resolver = code_cells.resolver.clone();
 
     let state = AppState {
         runtime: std::sync::Arc::new(tokio::sync::RwLock::new(runtime)),
@@ -414,6 +417,15 @@ async fn main() -> Result<()> {
     // fs::* keep Value handlers (preserving S210) and read the live host backend
     // + sandbox toggle from AppState; the typed schema is attached separately.
     register_fs(&iii, &state);
+
+    // Injected console UI: the explorer page + shell::* trigger renderers
+    // (assets embedded from ui/dist; see src/ui.rs).
+    ui::register(&iii);
+
+    // The workspace change feed: a system-level directory watch behind the
+    // shell::changed trigger type — subscribers name the directory in their
+    // binding config.
+    events::register_changed_trigger(&iii, watch_resolver);
 
     // Background reaper: time-based eviction of finished JobRecords. Without
     // it, an agent that uses exec_bg + status-polling (and never calls
